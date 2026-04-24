@@ -169,7 +169,7 @@ export default function Menu3D() {
               onClick={() => {
                 const items = cart.map(i => i.nombre).join(", ")
                 window.open(
-                  `https://wa.me/521XXXXXXXXXX?text=${encodeURIComponent(
+                  `https://wa.me/5215197582?text=${encodeURIComponent(
                     `Mesa ${mesa || "General"}: ${items}`
                   )}`
                 )
