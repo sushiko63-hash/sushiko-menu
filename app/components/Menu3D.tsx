@@ -1,56 +1,32 @@
 "use client"
+
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
-import {
-  motion,
-  useScroll,
-  useTransform,
-  useSpring,
-  AnimatePresence
-} from "framer-motion"
+import { motion, useScroll, useTransform } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { menu } from "../data/menu"
 
-/* 🔊 SONIDO */
-function useSound() {
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+/* 🌸 Sakura FIX SSR */
+function Sakura() {
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    audioRef.current = new Audio("/sounds/click.mp3")
+    setMounted(true)
   }, [])
 
-  const play = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.play()
-    }
-  }
-
-  return play
-}
-
-/* 🌸 Sakura */
-function Sakura() {
-  const sakuras = Array.from({ length: 10 }).map((_, i) => ({
-    left: `${(i * 10) % 100}%`,
-    delay: i * 0.5,
-    duration: 10 + i
-  }))
+  if (!mounted) return null
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 opacity-20">
-      {sakuras.map((s, i) => (
+      {[...Array(10)].map((_, i) => (
         <motion.div
           key={i}
-          initial={{ y: -50 }}
-          animate={{ y: "110vh", rotate: 360 }}
+          initial={{ y: -50, x: `${Math.random() * 100}%` }}
+          animate={{ y: "110vh" }}
           transition={{
-            duration: s.duration,
-            delay: s.delay,
-            repeat: Infinity,
-            ease: "linear"
+            duration: 12 + Math.random() * 6,
+            repeat: Infinity
           }}
-          style={{ left: s.left }}
           className="absolute text-pink-300 text-xs"
         >
           ✿
@@ -61,7 +37,7 @@ function Sakura() {
 }
 
 /* 🍣 ESCENA */
-function SushiScene({ item, addToCart, triggerFly }: any) {
+function SushiScene({ item, addToCart }: any) {
   const ref = useRef(null)
 
   const { scrollYProgress } = useScroll({
@@ -69,55 +45,51 @@ function SushiScene({ item, addToCart, triggerFly }: any) {
     offset: ["start end", "center center"]
   })
 
-  const smooth = useSpring(scrollYProgress, {
-    stiffness: 60,
-    damping: 20
-  })
+  const scale = useTransform(scrollYProgress, [0, 1], [0.9, 1.1])
+  const opacity = useTransform(scrollYProgress, [0, 1], [0, 1])
+  const y = useTransform(scrollYProgress, [0, 1], [80, 0])
+  const blurValue = useTransform(scrollYProgress, [0, 1], [12, 0])
 
-  const scale = useTransform(smooth, [0, 1], [0.8, 1.2])
-  const opacity = useTransform(smooth, [0, 1], [0, 1])
-  const y = useTransform(smooth, [0, 1], [120, 0])
-  const blur = useTransform(smooth, [0, 1], [20, 0])
-
-  const filter = useTransform(blur, (b) => `blur(${b}px)`)
+  const filter = useTransform(blurValue, (b) => `blur(${b}px)`)
 
   return (
-    <section ref={ref} className="h-[130vh] flex items-center justify-center">
+    <section
+      ref={ref}
+      className="h-[120vh] flex items-center justify-center relative"
+    >
       <div className="flex flex-col items-center text-center max-w-xl">
 
-        <motion.div style={{ scale, opacity, y, filter }}>
+        <motion.div
+          style={{ scale, opacity, y, filter }}
+          className="mb-10"
+        >
           <Image
-            src={item.image + "?v=3"}
+            src={item.image}
             alt={item.nombre}
             width={500}
-            height={320}
-            unoptimized
-            className="drop-shadow-[0_80px_160px_rgba(0,0,0,1)]"
+            height={400}
+            className="object-contain drop-shadow-[0_50px_120px_rgba(0,0,0,0.9)]"
+            priority
           />
         </motion.div>
 
-        <motion.h2 style={{ opacity, y }} className="text-5xl mt-6">
+        <motion.h2 style={{ opacity, y }} className="text-5xl font-light mb-4">
           {item.nombre}
         </motion.h2>
 
-        <motion.p style={{ opacity, y }} className="text-gray-400 mt-2">
+        <motion.p style={{ opacity, y }} className="text-gray-400 mb-6">
           {item.descripcion}
         </motion.p>
 
-        <motion.p style={{ opacity, y }} className="text-red-400 mt-4">
+        <motion.p style={{ opacity, y }} className="text-2xl text-red-400 mb-8">
           ${item.precio} MXN
         </motion.p>
 
         <motion.button
           style={{ opacity, y }}
-          whileTap={{ scale: 0.9 }}
-          whileHover={{ scale: 1.05 }}
-          onClick={(e) => {
-            const rect = (e.target as HTMLElement).getBoundingClientRect()
-            triggerFly(item, rect)
-            addToCart(item)
-          }}
-          className="bg-white text-black px-8 py-3 rounded-full mt-6"
+          whileTap={{ scale: 0.95 }}
+          onClick={() => addToCart(item)}
+          className="bg-white text-black px-8 py-3 rounded-full"
         >
           Agregar
         </motion.button>
@@ -129,115 +101,69 @@ function SushiScene({ item, addToCart, triggerFly }: any) {
 /* 🧠 MAIN */
 export default function Menu3D() {
   const [cart, setCart] = useState<any[]>([])
-  const [flyItem, setFlyItem] = useState<any>(null)
+  const [mesa, setMesa] = useState<string | null>(null)
 
-  const params = useSearchParams()
-  const mesa = params.get("mesa") || "General"
+  const searchParams = useSearchParams()
 
-  const playSound = useSound()
+  /* ✅ FIX: evitar SSR mismatch */
+  useEffect(() => {
+    const m = searchParams.get("mesa")
+    setMesa(m)
+  }, [searchParams])
 
   const addToCart = (item: any) => {
-    playSound()
     setCart((prev) => [...prev, item])
   }
 
-  const triggerFly = (item: any, rect: DOMRect) => {
-    setFlyItem({
-      item,
-      x: rect.left,
-      y: rect.top
-    })
-
-    setTimeout(() => setFlyItem(null), 800)
-  }
-
-  const total = cart.reduce((acc, i) => acc + i.precio, 0)
-
   return (
-    <div className="bg-black text-white min-h-screen">
+    <div className="bg-black text-white min-h-screen overflow-x-hidden">
 
       <Sakura />
 
-      {/* 🔥 HEADER CON LOGO */}
+      {/* HEADER */}
       <div className="fixed top-0 left-0 w-full z-50 px-8 py-6 flex justify-between items-center">
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Image
-            src="/sushi/Logo.png"
-            alt="SUSHIKO logo"
-            width={100}
-            height={100}
-            className="object-contain"
+            src="/sushikomenu/Logo.png"
+            alt="logo"
+            width={40}
+            height={40}
           />
-          <span className="tracking-[0.3em] text-sm">SUSHIKO</span>
+          <span className="tracking-[0.2em] text-sm">SUSHIKO</span>
         </div>
 
-        <div className="text-xs opacity-70">
-          Mesa {mesa} • {cart.length}
+        <div className="text-sm opacity-70">
+          {mesa ? `Mesa ${mesa}` : "Mesa General"} • {cart.length}
         </div>
       </div>
 
       {/* MENU */}
-      <div className="pt-24">
+      <div className="pt-20">
         {menu.map((item) => (
           <SushiScene
             key={item.id}
             item={item}
             addToCart={addToCart}
-            triggerFly={triggerFly}
           />
         ))}
       </div>
 
-      {/* ITEM VOLANDO */}
-      <AnimatePresence>
-        {flyItem && (
-          <motion.div
-            initial={{
-              x: flyItem.x,
-              y: flyItem.y,
-              scale: 1
-            }}
-            animate={{
-              x: window.innerWidth - 80,
-              y: 40,
-              scale: 0.2,
-              opacity: 0.5
-            }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-            className="fixed z-[999]"
-          >
-            <Image
-              src={flyItem.item.image}
-              alt=""
-              width={120}
-              height={80}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* CARRITO */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 w-full px-6 py-4 bg-black/80 backdrop-blur-xl border-t border-white/10">
-          <div className="flex justify-between">
+        <div className="fixed bottom-0 left-0 w-full px-6 py-4 bg-black/70 backdrop-blur-xl border-t border-white/10">
+          <div className="flex justify-between items-center">
 
-            <span>
-              {cart.length} • ${total} MXN
-            </span>
+            <span>{cart.length} items</span>
 
             <button
-              onClick={async () => {
-                await fetch("/api/order", {
-                  method: "POST",
-                  body: JSON.stringify({
-                    mesa,
-                    items: cart
-                  })
-                })
-
-                alert("Pedido enviado 🍣")
+              onClick={() => {
+                const items = cart.map(i => i.nombre).join(", ")
+                window.open(
+                  `https://wa.me/521XXXXXXXXXX?text=${encodeURIComponent(
+                    `Mesa ${mesa || "General"}: ${items}`
+                  )}`
+                )
               }}
               className="bg-red-600 px-6 py-2 rounded-full"
             >
