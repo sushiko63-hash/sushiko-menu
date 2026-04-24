@@ -1,33 +1,37 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { motion, useScroll, useTransform } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { menu } from "../data/menu"
 
-/* 🌸 Sakura FIX SSR */
+/* 🌸 Sakura FIX PRODUCCIÓN */
 function Sakura() {
   const [mounted, setMounted] = useState(false)
+  const [positions, setPositions] = useState<number[]>([])
 
   useEffect(() => {
     setMounted(true)
+    // Generar posiciones SOLO en cliente (evita hydration error)
+    setPositions(Array.from({ length: 12 }, () => Math.random() * 100))
   }, [])
 
   if (!mounted) return null
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 opacity-20">
-      {[...Array(10)].map((_, i) => (
+    <div className="fixed inset-0 pointer-events-none z-0">
+      {positions.map((x, i) => (
         <motion.div
           key={i}
-          initial={{ y: -50, x: `${Math.random() * 100}%` }}
+          initial={{ y: -50, x: `${x}vw` }}
           animate={{ y: "110vh" }}
           transition={{
-            duration: 12 + Math.random() * 6,
-            repeat: Infinity
+            duration: 10 + i,
+            repeat: Infinity,
+            ease: "linear"
           }}
-          className="absolute text-pink-300 text-xs"
+          className="absolute text-pink-300 text-xs opacity-30"
         >
           ✿
         </motion.div>
@@ -37,32 +41,20 @@ function Sakura() {
 }
 
 /* 🍣 ESCENA */
-function SushiScene({ item, addToCart }: any) {
-  const ref = useRef(null)
+function SushiScene({ item, addToCart, playSound }: any) {
+  const { scrollYProgress } = useScroll()
 
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "center center"]
-  })
-
-  const scale = useTransform(scrollYProgress, [0, 1], [0.9, 1.1])
-  const opacity = useTransform(scrollYProgress, [0, 1], [0, 1])
-  const y = useTransform(scrollYProgress, [0, 1], [80, 0])
-  const blurValue = useTransform(scrollYProgress, [0, 1], [12, 0])
-
+  const scale = useTransform(scrollYProgress, [0, 1], [0.95, 1.05])
+  const opacity = useTransform(scrollYProgress, [0, 1], [0.6, 1])
+  const blurValue = useTransform(scrollYProgress, [0, 1], [10, 0])
   const filter = useTransform(blurValue, (b) => `blur(${b}px)`)
 
   return (
-    <section
-      ref={ref}
-      className="h-[120vh] flex items-center justify-center relative"
-    >
+    <section className="h-[120vh] flex items-center justify-center">
       <div className="flex flex-col items-center text-center max-w-xl">
 
-        <motion.div
-          style={{ scale, opacity, y, filter }}
-          className="mb-10"
-        >
+        {/* 🍣 IMAGEN */}
+        <motion.div style={{ scale, opacity, filter }} className="mb-10">
           <Image
             src={item.image}
             alt={item.nombre}
@@ -73,23 +65,27 @@ function SushiScene({ item, addToCart }: any) {
           />
         </motion.div>
 
-        <motion.h2 style={{ opacity, y }} className="text-5xl font-light mb-4">
+        {/* 🧾 TEXTO */}
+        <motion.h2 style={{ opacity }} className="text-5xl font-light mb-4">
           {item.nombre}
         </motion.h2>
 
-        <motion.p style={{ opacity, y }} className="text-gray-400 mb-6">
+        <motion.p style={{ opacity }} className="text-gray-400 mb-6">
           {item.descripcion}
         </motion.p>
 
-        <motion.p style={{ opacity, y }} className="text-2xl text-red-400 mb-8">
+        <motion.p style={{ opacity }} className="text-2xl text-red-400 mb-8">
           ${item.precio} MXN
         </motion.p>
 
+        {/* 🔊 BOTÓN */}
         <motion.button
-          style={{ opacity, y }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => addToCart(item)}
-          className="bg-white text-black px-8 py-3 rounded-full"
+          onClick={() => {
+            playSound()
+            addToCart(item)
+          }}
+          className="bg-white text-black px-8 py-3 rounded-full hover:scale-105 transition"
         >
           Agregar
         </motion.button>
@@ -105,11 +101,20 @@ export default function Menu3D() {
 
   const searchParams = useSearchParams()
 
-  /* ✅ FIX: evitar SSR mismatch */
+  /* 📲 MESA (QR) */
   useEffect(() => {
     const m = searchParams.get("mesa")
     setMesa(m)
   }, [searchParams])
+
+  /* 🔊 AUDIO FIX REAL (SIN REF BUG) */
+  const playSound = () => {
+    const audio = new Audio("/sushi/click.mp3")
+    audio.volume = 0.4
+    audio.play().catch(() => {
+      console.log("audio bloqueado")
+    })
+  }
 
   const addToCart = (item: any) => {
     setCart((prev) => [...prev, item])
@@ -118,17 +123,20 @@ export default function Menu3D() {
   return (
     <div className="bg-black text-white min-h-screen overflow-x-hidden">
 
+      {/* 🌸 Sakura */}
       <Sakura />
 
-      {/* HEADER */}
+      {/* 🔝 HEADER */}
       <div className="fixed top-0 left-0 w-full z-50 px-8 py-6 flex justify-between items-center">
 
+        {/* ✅ LOGO CORREGIDO */}
         <div className="flex items-center gap-3">
           <Image
-            src="/sushikomenu/Logo.png"
+            src="/sushi/Logo.png"
             alt="logo"
             width={40}
             height={40}
+            priority
           />
           <span className="tracking-[0.2em] text-sm">SUSHIKO</span>
         </div>
@@ -138,18 +146,19 @@ export default function Menu3D() {
         </div>
       </div>
 
-      {/* MENU */}
+      {/* 🍣 MENU */}
       <div className="pt-20">
         {menu.map((item) => (
           <SushiScene
             key={item.id}
             item={item}
             addToCart={addToCart}
+            playSound={playSound}
           />
         ))}
       </div>
 
-      {/* CARRITO */}
+      {/* 🧾 CARRITO */}
       {cart.length > 0 && (
         <div className="fixed bottom-0 left-0 w-full px-6 py-4 bg-black/70 backdrop-blur-xl border-t border-white/10">
           <div className="flex justify-between items-center">
